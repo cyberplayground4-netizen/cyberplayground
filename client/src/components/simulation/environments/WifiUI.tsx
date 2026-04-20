@@ -1,4 +1,3 @@
-import React from 'react';
 import { Wifi, TriangleAlert, Lock } from 'lucide-react';
 
 interface WifiUIProps { environment: any; }

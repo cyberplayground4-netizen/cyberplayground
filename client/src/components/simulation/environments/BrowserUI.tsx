@@ -1,4 +1,3 @@
-import React from 'react';
 import { Lock, Unlock, TriangleAlert } from 'lucide-react';
 
 interface BrowserUIProps { environment: any; }

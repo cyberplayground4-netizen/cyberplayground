@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface SMSUIProps { environment: any; }
 
 export function SMSUI({ environment }: SMSUIProps) {
