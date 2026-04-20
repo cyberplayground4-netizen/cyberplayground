@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model users {
+  id                    String        @id @default(uuid())
+  name                  String
+  email                 String        @unique
+  password_hash         String
+  email_verified        Boolean       @default(false)
+  verification_token    String?
+  token_expiry          DateTime?
+  xp                    Int           @default(0)
+  level                 String        @default("Recruit")
+  streak                Int           @default(0)
+  last_active           DateTime      @default(now())
+  failed_login_attempts Int           @default(0)
+  locked_until          DateTime?
+  created_at            DateTime      @default(now())
+  updated_at            DateTime      @updatedAt
+
+  subscriptions         subscriptions[]
+  user_progress         user_progress[]
+  user_badges           user_badges[]
+
+  @@map(name: "users")
+}
+
+model subscriptions {
+  id                       String   @id @default(uuid())
+  user_id                  String
+  user                     users    @relation(fields: [user_id], references: [id])
+  razorpay_subscription_id String   @unique
+  razorpay_plan_id         String
+  status                   String
+  current_period_start     DateTime
+  current_period_end       DateTime
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@map(name: "subscriptions")
+  @@index([user_id])
+  @@index([user_id, status])
+}
+
+model scenarios {
+  id               String   @id @default(uuid())
+  module           String
+  title            String
+  description      String
+  difficulty       Int
+  environment_type String
+  content_json     Json
+  is_premium       Boolean  @default(false)
+  created_at       DateTime @default(now())
+
+  user_progress    user_progress[]
+  daily_challenges daily_challenges[]
+
+  @@map(name: "scenarios")
+  @@index([module, difficulty])
+}
+
+model user_progress {
+  id                 String   @id @default(uuid())
+  user_id            String
+  user               users    @relation(fields: [user_id], references: [id])
+  scenario_id        String
+  scenario           scenarios @relation(fields: [scenario_id], references: [id])
+  result             String   // "safe", "compromised"
+  xp_earned          Int
+  time_taken_seconds Int
+  used_hint          Boolean
+  completed_at       DateTime @default(now())
+
+  @@map(name: "user_progress")
+  @@index([user_id])
+  @@index([user_id, scenario_id])
+}
+
+model badges {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  description    String
+  icon           String
+  criteria_type  String
+  criteria_value Int
+
+  user_badges    user_badges[]
+
+  @@map(name: "badges")
+}
+
+model user_badges {
+  id        String   @id @default(uuid())
+  user_id   String
+  user      users    @relation(fields: [user_id], references: [id])
+  badge_id  String
+  badge     badges   @relation(fields: [badge_id], references: [id])
+  earned_at DateTime @default(now())
+
+  @@map(name: "user_badges")
+}
+
+model daily_challenges {
+  id             String    @id @default(uuid())
+  scenario_id    String
+  scenario       scenarios @relation(fields: [scenario_id], references: [id])
+  challenge_date DateTime
+  bonus_xp       Int
+
+  @@map(name: "daily_challenges")
+  @@index([challenge_date])
+  @@unique([scenario_id, challenge_date])
+}
+
+model webhook_events {
+  id           String   @id @default(uuid())
+  event_id     String   @unique
+  event_type   String
+  payload      Json
+  status       String
+  processed_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  @@map(name: "webhook_events")
+  @@index([event_id])
+}
