@@ -1,7 +1,26 @@
 node_modules/
 dist/
+
+# Environment files — never commit secrets
 .env
+.env.local
+.env.production
+server/.env
+client/.env
+
+# Keep the example template
+!.env.example
+
+# SQLite dev database (not needed in git — seeded fresh)
+server/prisma/dev.db
+server/prisma/dev.db-journal
+server/prisma/dev.db-shm
+server/prisma/dev.db-wal
+
+# Build output
 *.log
 .DS_Store
 coverage/
 .prisma/
+client/dist/
+server/dist/

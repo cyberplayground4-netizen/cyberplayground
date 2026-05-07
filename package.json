@@ -4,6 +4,7 @@
   "private": true,
   "description": "Gamified cybersecurity training simulator",
   "scripts": {
+    "setup": "powershell -ExecutionPolicy Bypass -File setup.ps1",
     "client:install": "cd client && npm install",
     "server:install": "cd server && npm install",
     "install:all": "npm run client:install && npm run server:install",
