@@ -13,6 +13,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 export function Timer({ initialSeconds, onExpire, isRunning }: TimerProps) {
   const [timeLeft, setTimeLeft] = useState(initialSeconds);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setTimeLeft(initialSeconds); }, [initialSeconds]);
 
   useEffect(() => {

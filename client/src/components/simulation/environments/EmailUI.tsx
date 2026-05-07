@@ -1,5 +1,12 @@
+interface EmailEnvironment {
+  subject: string;
+  senderName: string;
+  senderEmail: string;
+  body: string;
+}
+
 interface EmailUIProps {
-  environment: any;
+  environment: EmailEnvironment;
 }
 
 export function EmailUI({ environment }: EmailUIProps) {

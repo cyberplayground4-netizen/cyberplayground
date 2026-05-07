@@ -102,33 +102,109 @@ router.get('/badges', requireAuth, async (req, res) => {
   }
 });
 
-// ── Recommendation: next scenario based on weak areas ──────────────────────
+// ── Adaptive Recommendation: prioritize weak areas ─────────────────────────
 router.get('/recommend', requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
 
-    // Get completed scenario IDs
-    const done = await prisma.user_progress.findMany({
+    // Get all user progress with module info
+    const progress = await prisma.user_progress.findMany({
       where: { user_id: userId },
-      select: { scenario_id: true },
+      include: { scenario: { select: { id: true, module: true } } },
     });
-    const doneIds = new Set(done.map(d => d.scenario_id));
+    const doneIds = new Set(progress.map(p => p.scenario_id));
 
-    // Get all available scenarios
+    // Calculate per-module pass rates
+    const moduleStats: Record<string, { total: number; safe: number }> = {};
+    for (const p of progress) {
+      const mod = p.scenario.module;
+      if (!moduleStats[mod]) moduleStats[mod] = { total: 0, safe: 0 };
+      moduleStats[mod].total++;
+      if (p.result === 'safe') moduleStats[mod].safe++;
+    }
+
+    // Identify weak modules (pass rate < 60%)
+    const weakModules = Object.entries(moduleStats)
+      .filter(([, data]) => data.total > 0 && (data.safe / data.total) < 0.6)
+      .sort((a, b) => (a[1].safe / a[1].total) - (b[1].safe / b[1].total))
+      .map(([name]) => name);
+
+    // Check premium status
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      include: { subscriptions: { where: { status: 'active' } } },
+    });
+    const hasPremium = user?.subscriptions && user.subscriptions.length > 0;
+
+    // Get all scenarios the user can access
     const all = await prisma.scenarios.findMany({
-      where: { is_premium: false },
+      where: hasPremium ? {} : { is_premium: false },
       orderBy: { difficulty: 'asc' },
     });
 
-    // Find first un-played scenario
-    const next = all.find(s => !doneIds.has(s.id));
-    if (next) {
-      return res.json({ recommendation: { id: next.id, title: next.title, module: next.module, difficulty: next.difficulty } });
+    // Strategy 1: Find unplayed scenarios in weak modules
+    if (weakModules.length > 0) {
+      for (const weakModule of weakModules) {
+        const candidate = all.find(s => s.module === weakModule && !doneIds.has(s.id));
+        if (candidate) {
+          return res.json({
+            recommendation: {
+              id: candidate.id,
+              title: candidate.title,
+              module: candidate.module,
+              difficulty: candidate.difficulty,
+              reason: `Strengthen your weakest area: ${weakModule}`,
+            },
+            weakModules,
+          });
+        }
+      }
     }
 
-    // All done — replay weakest
-    res.json({ recommendation: null, message: 'All free scenarios completed!' });
+    // Strategy 2: Find any unplayed scenario
+    const next = all.find(s => !doneIds.has(s.id));
+    if (next) {
+      return res.json({
+        recommendation: {
+          id: next.id,
+          title: next.title,
+          module: next.module,
+          difficulty: next.difficulty,
+          reason: 'Explore a new scenario',
+        },
+        weakModules,
+      });
+    }
+
+    // Strategy 3: All done — suggest replaying the worst-performing scenario
+    const worstResult = progress
+      .filter(p => p.result === 'compromised')
+      .sort((a, b) => a.xp_earned - b.xp_earned)[0];
+
+    if (worstResult) {
+      const replayScenario = all.find(s => s.id === worstResult.scenario_id);
+      if (replayScenario) {
+        return res.json({
+          recommendation: {
+            id: replayScenario.id,
+            title: replayScenario.title,
+            module: replayScenario.module,
+            difficulty: replayScenario.difficulty,
+            reason: 'Retry a scenario you previously failed',
+            isReplay: true,
+          },
+          weakModules,
+        });
+      }
+    }
+
+    res.json({
+      recommendation: null,
+      message: 'Congratulations! You\'ve mastered all available scenarios.',
+      weakModules,
+    });
   } catch (error) {
+    console.error('[Recommend Error]', error);
     res.status(500).json({ error: 'Failed to generate recommendation' });
   }
 });

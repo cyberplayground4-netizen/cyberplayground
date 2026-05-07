@@ -1,4 +1,14 @@
-interface SMSUIProps { environment: any; }
+interface SMSMessage {
+  from: 'them' | 'system';
+  text: string;
+}
+
+interface SMSEnvironment {
+  sender?: string;
+  messages?: SMSMessage[];
+}
+
+interface SMSUIProps { environment: SMSEnvironment; }
 
 export function SMSUI({ environment }: SMSUIProps) {
   return (
@@ -27,7 +37,7 @@ export function SMSUI({ environment }: SMSUIProps) {
 
       {/* Message bubbles */}
       <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '280px', background: '#000' }}>
-        {(environment.messages ?? []).map((msg: any, i: number) => (
+        {(environment.messages ?? []).map((msg: SMSMessage, i: number) => (
           <div key={i} style={{
             alignSelf: msg.from === 'them' ? 'flex-start' : 'flex-end',
             maxWidth: '78%',

@@ -1,5 +1,10 @@
+interface PhoneEnvironment {
+  callerId: string;
+  voiceText: string;
+}
+
 interface PhoneUIProps {
-  environment: any;
+  environment: PhoneEnvironment;
 }
 
 export function PhoneUI({ environment }: PhoneUIProps) {

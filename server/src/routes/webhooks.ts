@@ -3,21 +3,21 @@ import { SubscriptionService } from '../services/subscription.service.js';
 
 const router = express.Router();
 
-// Webhooks must handle raw body for signature verification in standard setups, 
-// but since Express is using body-parser, Razorpay signatures can use the stringified body.
-// Better practice is raw body, but for simplicity we verify against req.body or a stringified version.
+// Webhook route uses raw body (configured in index.ts before json middleware).
+// This ensures signature verification uses the exact bytes received from Razorpay.
 router.post('/razorpay', async (req, res) => {
   try {
     const signature = req.headers['x-razorpay-signature'] as string;
-    const payloadBase = req.body;
-    // We typically need raw body. If express.json() is applied globally, we use JSON.stringify 
-    // note: keys ordering might break signature. In production, use express.raw for this route.
-    const payloadStr = JSON.stringify(req.body); 
+    
+    // req.body is a Buffer since we use express.raw() for this route in index.ts
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
+    const payloadStr = rawBody.toString('utf8');
+    const payloadBase = JSON.parse(payloadStr);
 
     await SubscriptionService.handleWebhook(signature || '', payloadStr, payloadBase);
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Webhook Error:', error);
+    console.error('[Webhook Error]', error instanceof Error ? error.message : error);
     res.status(500).send('Webhook failed');
   }
 });

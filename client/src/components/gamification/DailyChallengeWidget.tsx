@@ -29,8 +29,20 @@ function useCountdown(expiresAt: string) {
   return timeLeft;
 }
 
+interface ChallengeData {
+  scenario: {
+    id: string;
+    title: string;
+    module: string;
+    environment_type: string;
+  };
+  bonusXp: number;
+  alreadyCompleted: boolean;
+  expiresAt: string;
+}
+
 export function DailyChallengeWidget() {
-  const [challenge, setChallenge] = useState<any>(null);
+  const [challenge, setChallenge] = useState<ChallengeData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

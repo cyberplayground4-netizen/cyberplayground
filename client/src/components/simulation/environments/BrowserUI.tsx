@@ -1,6 +1,17 @@
 import { Lock, Unlock, TriangleAlert } from 'lucide-react';
 
-interface BrowserUIProps { environment: any; }
+interface BrowserEnvironment {
+  isSecure?: boolean;
+  url?: string;
+  brandColor?: string;
+  brandLetter?: string;
+  siteName?: string;
+  pageTitle?: string;
+  ctaLabel?: string;
+  subText?: string;
+}
+
+interface BrowserUIProps { environment: BrowserEnvironment; }
 
 export function BrowserUI({ environment }: BrowserUIProps) {
   const isSecure = environment.isSecure ?? false;

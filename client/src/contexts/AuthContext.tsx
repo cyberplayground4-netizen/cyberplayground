@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const response = await api.get('/api/auth/me');
         setUser(response.data.user);
-      } catch (error) {
+      } catch {
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -67,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

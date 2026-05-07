@@ -55,8 +55,9 @@ export default function RegisterPage() {
       await api.post('/api/auth/register', { name, email, password });
       toast.success('Account created!', 'Redirecting to login in 3 seconds…');
       setTimeout(() => navigate('/login'), 3000);
-    } catch (err: any) {
-      toast.error('Registration failed', err.response?.data?.error || 'Please try again.');
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      toast.error('Registration failed', error.response?.data?.error || 'Please try again.');
     } finally {
       setIsLoading(false);
     }

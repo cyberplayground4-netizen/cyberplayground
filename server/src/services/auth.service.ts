@@ -23,13 +23,16 @@ export class AuthService {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+    const isDev = process.env.NODE_ENV !== 'production';
+
     const user = await prisma.users.create({
       data: {
         name: data.name,
         email: data.email,
         password_hash: passwordHash,
-        verification_token: verificationToken,
-        token_expiry: tokenExpiry,
+        verification_token: isDev ? null : verificationToken,
+        token_expiry: isDev ? null : tokenExpiry,
+        email_verified: isDev, // auto-verify in development
       },
     });
 
@@ -102,7 +105,8 @@ export class AuthService {
       throw new Error('Invalid email or password');
     }
 
-    if (!user.email_verified) {
+    // Skip email verification check in development mode
+    if (!user.email_verified && process.env.NODE_ENV === 'production') {
       throw new Error('Please verify your email before logging in');
     }
 

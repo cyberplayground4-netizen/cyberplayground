@@ -1,7 +1,16 @@
 import express from 'express';
+import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import prisma from '../config/database.js';
 import { syncLevel, updateStreak, checkAndAwardBadges, getLevelForXp } from '../services/gamification.service.js';
+
+const FREE_PLAN_LIMIT = 3;
+
+const submitSchema = z.object({
+  isSafe: z.boolean(),
+  timeTaken: z.number().int().min(0).max(3600).default(0),
+  usedHint: z.boolean().default(false),
+});
 
 const router = express.Router();
 
@@ -14,13 +23,18 @@ router.get('/', requireAuth, async (req, res) => {
     });
     const hasPremium = user?.subscriptions && user.subscriptions.length > 0;
 
+    // Always return ALL scenarios, but mark premium ones for UI locking
     const scenarios = await prisma.scenarios.findMany({
-      where: hasPremium ? {} : { is_premium: false },
       select: {
         id: true, module: true, title: true, description: true,
         difficulty: true, is_premium: true, environment_type: true,
       },
       orderBy: [{ module: 'asc' }, { difficulty: 'asc' }],
+    });
+
+    // Count user's completed simulations for free plan tracking
+    const completedCount = await prisma.user_progress.count({
+      where: { user_id: req.session.userId },
     });
 
     // Attach completion status per scenario for this user
@@ -37,7 +51,14 @@ router.get('/', requireAuth, async (req, res) => {
       completionResult: completionMap[s.id] ?? null,
     }));
 
-    res.json({ scenarios: enriched });
+    res.json({
+      scenarios: enriched,
+      plan: {
+        isPremium: hasPremium,
+        simulationsUsed: completedCount,
+        simulationsLimit: hasPremium ? Infinity : FREE_PLAN_LIMIT,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch scenarios' });
   }
@@ -60,6 +81,26 @@ router.get('/:id', requireAuth, async (req, res) => {
       }
     }
 
+    // Enforce free plan limit for non-premium scenarios
+    if (!scenario.is_premium) {
+      const user = await prisma.users.findUnique({
+        where: { id: req.session.userId },
+        include: { subscriptions: { where: { status: 'active' } } },
+      });
+      const hasPremium = user?.subscriptions && user.subscriptions.length > 0;
+      if (!hasPremium) {
+        const usageCount = await prisma.user_progress.count({
+          where: { user_id: req.session.userId },
+        });
+        if (usageCount >= FREE_PLAN_LIMIT) {
+          return res.status(403).json({
+            error: 'Free plan limit reached. Upgrade to Premium for unlimited simulations.',
+            limitReached: true,
+          });
+        }
+      }
+    }
+
     res.json({ scenario });
   } catch (error) {
     res.status(500).json({ error: 'Failed to load scenario' });
@@ -69,15 +110,21 @@ router.get('/:id', requireAuth, async (req, res) => {
 // ── Submit scenario outcome ────────────────────────────────────────────────
 router.post('/:id/submit', requireAuth, async (req, res) => {
   try {
-    const { isSafe, timeTaken, usedHint } = req.body;
+    // Validate input
+    const parsed = submitSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    }
+    const { isSafe, timeTaken, usedHint } = parsed.data;
     const userId = req.session.userId!;
 
     const id = req.params.id as string;
     const scenario = await prisma.scenarios.findUnique({ where: { id } });
     if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
 
-    const content = scenario.content_json as any;
-    let xp = isSafe ? (content.xpReward || 100) : 10;
+    const content = scenario.content_json as Record<string, unknown>;
+    const xpReward = typeof content.xpReward === 'number' ? content.xpReward : 100;
+    let xp = isSafe ? xpReward : 10;
     const bonuses: string[] = [];
 
     if (isSafe) {

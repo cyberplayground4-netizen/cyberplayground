@@ -1,9 +1,20 @@
 import { Wifi, TriangleAlert, Lock } from 'lucide-react';
 
-interface WifiUIProps { environment: any; }
+interface WifiNetwork {
+  signalStrength: number;
+  ssid: string;
+  isMalicious?: boolean;
+  isOpen: boolean;
+}
+
+interface WifiEnvironment {
+  networks?: WifiNetwork[];
+}
+
+interface WifiUIProps { environment: WifiEnvironment; }
 
 export function WifiUI({ environment }: WifiUIProps) {
-  const networks: any[] = environment.networks ?? [];
+  const networks: WifiNetwork[] = environment.networks ?? [];
 
   return (
     <div style={{
@@ -19,7 +30,7 @@ export function WifiUI({ environment }: WifiUIProps) {
 
       {/* Network list */}
       <div style={{ padding: '8px 0' }}>
-        {networks.map((net: any, i: number) => (
+        {networks.map((net: WifiNetwork, i: number) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '14px 20px',

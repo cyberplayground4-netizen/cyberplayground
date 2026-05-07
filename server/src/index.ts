@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -38,6 +38,10 @@ app.use(
   })
 );
 
+// ── Webhook route MUST use raw body for HMAC verification ──────────────────────
+// Parse raw body for webhooks BEFORE json middleware applies globally
+app.use('/api/webhooks', express.raw({ type: 'application/json' }));
+
 // ── Body Parsing ───────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -67,6 +71,25 @@ app.use(
   })
 );
 
+// ── CSRF Protection ────────────────────────────────────────────────────────────
+// Simple origin-based CSRF check for state-changing requests (non-GET/HEAD/OPTIONS)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (safeMethods.includes(req.method)) return next();
+
+  // Webhook routes are signed, skip CSRF check
+  if (req.path.startsWith('/api/webhooks')) return next();
+
+  const origin = req.headers.origin || req.headers.referer;
+  const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:5173';
+
+  if (origin && !origin.startsWith(allowedOrigin)) {
+    return res.status(403).json({ error: 'CSRF validation failed' });
+  }
+
+  next();
+});
+
 // ── API Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/scenarios', scenarioRoutes);
@@ -81,8 +104,18 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ── 404 Handler ────────────────────────────────────────────────────────────────
-app.use((_req, res) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found' });
+});
+
+// ── Global Error Handler ───────────────────────────────────────────────────────
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(`[ERROR] ${err.message}`, err.stack);
+  res.status(500).json({
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message,
+  });
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────

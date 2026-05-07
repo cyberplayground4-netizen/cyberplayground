@@ -8,8 +8,15 @@ import api from '../services/api';
 import { Award, ShieldCheck, Share2, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+interface Certificate {
+  id: string;
+  title: string;
+  level: string;
+  issuedAt: string;
+}
+
 export default function CertificatePage() {
-  const [certs, setCerts]     = useState<any[]>([]);
+  const [certs, setCerts]     = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 

@@ -45,8 +45,9 @@ export default function LoginPage() {
       login(response.data.user);
       toast.success('Welcome back!', 'Redirecting to your dashboard…');
       navigate('/dashboard');
-    } catch (err: any) {
-      toast.error('Login failed', err.response?.data?.error || 'Please check your credentials.');
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      toast.error('Login failed', error.response?.data?.error || 'Please check your credentials.');
     } finally {
       setIsLoading(false);
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../common/Card';
 import { Button } from '../common/Button';
 import { Timer } from './Timer';
@@ -9,11 +9,13 @@ import { SMSUI } from './environments/SMSUI';
 import { BrowserUI } from './environments/BrowserUI';
 import { WifiUI } from './environments/WifiUI';
 import { XpPopup } from '../gamification/XpPopup';
+import { ReplayView } from './ReplayView';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAppStore } from '../../stores/useAppStore';
 import {
   ShieldCheck, ShieldX, Lightbulb, ArrowLeft,
-  RotateCcw, Star, Clock, PlayCircle,
+  RotateCcw, Star, Clock, PlayCircle, FileSearch,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -23,11 +25,37 @@ const DIFF_LABELS = ['', 'Beginner', 'Intermediate', 'Advanced'];
 const DIFF_COLORS = ['', 'var(--neon-green)', 'var(--neon-yellow)', 'var(--neon-red)'];
 const DIFF_BG     = ['', 'var(--neon-green-dim)', 'var(--neon-yellow-dim)', 'var(--neon-red-dim)'];
 
+interface ScenarioChoice {
+  id: string; text: string; isSafe: boolean; consequence: string;
+}
+
+interface ScenarioContext {
+  environment: Record<string, unknown>;
+  narrative: { setting: string; urgency?: string };
+  timerSeconds: number;
+  xpReward: number;
+  hints: string[];
+  explanation: { bestPractice: string; redFlags: string[] };
+  choices: ScenarioChoice[];
+}
+
+interface ScenarioData {
+  id: string; title: string; module: string; environment_type: string; difficulty: number;
+  content_json: ScenarioContext;
+}
+
+interface ResultData {
+  newTotalXp: number; level: string; prevLevel: string; xpEarned: number;
+  bonuses: string[]; leveledUp: boolean; newBadges: string[];
+}
+
 export default function SimulationEngine() {
   const { id }     = useParams<{ id: string }>();
+  const navigate   = useNavigate();
   const { updateUser } = useAuth();
+  const incrementUsage = useAppStore((s) => s.incrementUsage);
 
-  const [scenario,  setScenario]  = useState<any>(null);
+  const [scenario,  setScenario]  = useState<ScenarioData | null>(null);
   const [phase,     setPhase]     = useState<Phase>('loading');
   const [errorMsg,  setErrorMsg]  = useState('');
 
@@ -37,11 +65,12 @@ export default function SimulationEngine() {
   const [showHint,         setShowHint]         = useState(false);
   const startTimeRef = useRef<number>(0);
   const [outcome,          setOutcome]          = useState<'safe' | 'compromised' | null>(null);
-  const [resultData,       setResultData]       = useState<any>(null);
+  const [resultData,       setResultData]       = useState<ResultData | null>(null);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [submitting,       setSubmitting]       = useState(false);
   const [showXpPopup,      setShowXpPopup]      = useState(false);
   const [flashClass,       setFlashClass]       = useState('');
+  const [showReplay,       setShowReplay]       = useState(false);
 
   /* ── Load scenario ── */
   useEffect(() => {
@@ -81,6 +110,7 @@ export default function SimulationEngine() {
       setResultData(r.data);
       updateUser({ xp: r.data.newTotalXp, level: r.data.level });
       setShowXpPopup(true);
+      incrementUsage();
     } catch { /* non-critical */ }
 
     setOutcome(isSafe ? 'safe' : 'compromised');
@@ -97,13 +127,13 @@ export default function SimulationEngine() {
   const requestHint = () => { setUsedHint(true); setShowHint(true); };
 
   /* ── Render environment ── */
-  const renderEnv = (content: any) => {
+  const renderEnv = (content: ScenarioContext) => {
     switch (scenario?.environment_type) {
-      case 'email':   return <EmailUI   environment={content.environment} />;
-      case 'sms':     return <SMSUI     environment={content.environment} />;
-      case 'browser': return <BrowserUI environment={content.environment} />;
-      case 'wifi':    return <WifiUI    environment={content.environment} />;
-      case 'phone':   return <PhoneUI   environment={content.environment} />;
+      case 'email':   return <EmailUI   environment={content.environment as any} />;
+      case 'sms':     return <SMSUI     environment={content.environment as any} />;
+      case 'browser': return <BrowserUI environment={content.environment as any} />;
+      case 'wifi':    return <WifiUI    environment={content.environment as any} />;
+      case 'phone':   return <PhoneUI   environment={content.environment as any} />;
       default: return <div style={{ padding: 24, color: 'var(--text-muted)' }}>Unknown environment</div>;
     }
   };
@@ -126,6 +156,8 @@ export default function SimulationEngine() {
 
   const content = scenario?.content_json;
   const diff    = scenario?.difficulty ?? 1;
+
+  if (!content) return null;
 
   /* ════════════════════════════════════════════════════════════
      NARRATIVE PHASE — immersive full-screen card
@@ -304,7 +336,7 @@ export default function SimulationEngine() {
                     transition={{ delay: 0.25 }}
                     style={{ color: 'var(--text-muted)', maxWidth: 380, marginBottom: 16, lineHeight: 1.65, fontSize: '0.9rem' }}
                   >
-                    {content.choices.find((c: any) => c.id === selectedChoiceId)?.consequence}
+                    {content.choices.find((c: ScenarioChoice) => c.id === selectedChoiceId)?.consequence}
                   </motion.p>
                 )}
 
@@ -333,6 +365,9 @@ export default function SimulationEngine() {
                   transition={{ delay: 0.45 }}
                   style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}
                 >
+                  <Button variant="outline" size="sm" onClick={() => setShowReplay(true)} style={{ gap: 8 }}>
+                    <FileSearch size={14} /> Replay Analysis
+                  </Button>
                   <Link to="/dashboard/simulations">
                     <Button variant="outline" size="sm">
                       <RotateCcw size={14} /> Play Another
@@ -363,7 +398,7 @@ export default function SimulationEngine() {
 
               {phase === 'playing' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {content.choices.map((choice: any, i: number) => (
+                  {content.choices.map((choice: ScenarioChoice, i: number) => (
                     <motion.button
                       key={choice.id}
                       id={`choice-${choice.id}`}
@@ -487,6 +522,26 @@ export default function SimulationEngine() {
           prevLevel={resultData.prevLevel ?? ''}
           newBadges={resultData.newBadges ?? []}
           onClose={() => setShowXpPopup(false)}
+        />
+      )}
+
+      {/* Replay Analysis Overlay */}
+      {showReplay && scenario && selectedChoiceId && (
+        <ReplayView
+          scenarioTitle={scenario.title}
+          module={scenario.module}
+          narrative={content.narrative}
+          choices={content.choices}
+          selectedChoiceId={selectedChoiceId}
+          explanation={content.explanation}
+          timeTaken={Math.round((Date.now() - startTimeRef.current) / 1000)}
+          timerSeconds={content.timerSeconds}
+          usedHint={usedHint}
+          onClose={() => setShowReplay(false)}
+          onRestart={() => {
+            setShowReplay(false);
+            navigate(0); // reload the simulation
+          }}
         />
       )}
     </div>

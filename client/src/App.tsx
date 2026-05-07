@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from './contexts/AuthContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { SplashScreen } from './components/common/SplashScreen';
 import { SkeletonCard } from './components/common/SkeletonLoader';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+
+/* ── Lazy-loaded pages ── */
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+/* ── Suspense fallback ── */
+function SuspenseFallback() {
+  return (
+    <div style={{
+      minHeight: '100vh', background: 'var(--bg-deep)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div className="loader" style={{ width: 48, height: 48 }} />
+    </div>
+  );
+}
 
 /* ── Page transition wrapper ──────────────────────────────────────────────── */
 function PageTransition({ children }: { children: React.ReactNode }) {
@@ -63,26 +79,30 @@ function App() {
   const location = useLocation();
 
   return (
-    <>
+    <ErrorBoundary>
       {/* Splash — only shows once per session */}
       {!splashDone && <SplashScreen onDone={handleSplashDone} />}
 
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
-          <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
-          <Route path="/register" element={<PageTransition><RegisterPage /></PageTransition>} />
-          <Route
-            path="/dashboard/*"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AnimatePresence>
-    </>
+      <Suspense fallback={<SuspenseFallback />}>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
+            <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
+            <Route path="/register" element={<PageTransition><RegisterPage /></PageTransition>} />
+            <Route
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* 404 catch-all */}
+            <Route path="*" element={<PageTransition><NotFoundPage /></PageTransition>} />
+          </Routes>
+        </AnimatePresence>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

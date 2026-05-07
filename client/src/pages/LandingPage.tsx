@@ -252,7 +252,7 @@ export default function LandingPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <ShieldAlert color="var(--neon-green)" size={16} />
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>© 2025 CyberPlayground</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>© {new Date().getFullYear()} CyberPlayground</span>
         </div>
         <div style={{ display: 'flex', gap: 24 }}>
           {['Privacy', 'Terms', 'Support'].map(l => (

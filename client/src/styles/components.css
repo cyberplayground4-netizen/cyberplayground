@@ -441,7 +441,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   LOADER SPINNER
+   LOADER SPINNER (component-scoped styles, keyframes in index.css)
 ══════════════════════════════════════════════════════════════ */
 .loader {
   width: 28px; height: 28px;
@@ -451,21 +451,6 @@
   animation: spin 0.75s linear infinite;
   display: block;
   flex-shrink: 0;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ANIMATIONS — UTILITY
-══════════════════════════════════════════════════════════════ */
-@keyframes spin       { to { transform: rotate(360deg); } }
-@keyframes pulse      { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.7; transform:scale(1.05); } }
-@keyframes fadeInUp   { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-@keyframes fadeInDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
-@keyframes fadeIn     { from { opacity:0; } to { opacity:1; } }
-@keyframes shimmer    { 0% { background-position:-400px 0; } 100% { background-position:400px 0; } }
-
-@keyframes glow-pulse {
-  0%,100% { box-shadow: 0 0 6px rgba(0,255,171,0.3); }
-  50%     { box-shadow: 0 0 20px rgba(0,255,171,0.7); }
 }
 
 /* ══════════════════════════════════════════════════════════════

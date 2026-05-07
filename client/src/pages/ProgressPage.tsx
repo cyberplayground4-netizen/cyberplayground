@@ -23,9 +23,48 @@ const BADGE_BG: Record<string, string> = {
   'Speed Demon':       'rgba(59,130,246,0.1)',
 };
 
+interface Level {
+  xp: number;
+  title: string;
+}
+
+interface ModuleStat {
+  name: string;
+  passRate: number;
+  safe: number;
+  total: number;
+}
+
+interface RecentActivity {
+  result: 'safe' | 'danger';
+  module: string;
+  xp: number;
+}
+
+interface ProgressStats {
+  overview: {
+    levelIndex: number;
+    totalXp: number;
+    nextLevelXp: number | null;
+    totalSimulations: number;
+    passRate: number;
+    streak: number;
+    level: string;
+  };
+  levels: Level[];
+  moduleStats: ModuleStat[];
+  weakModules: string[];
+  recent: RecentActivity[];
+}
+
+interface Badge {
+  name: string;
+  description: string;
+}
+
 export default function ProgressPage() {
-  const [stats, setStats]   = useState<any>(null);
-  const [badges, setBadges] = useState<any[]>([]);
+  const [stats, setStats]   = useState<ProgressStats | null>(null);
+  const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -110,7 +149,7 @@ export default function ProgressPage() {
               height={10}
             />
             <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {stats.levels.map((lvl: any, i: number) => (
+              {stats.levels.map((lvl: Level, i: number) => (
                 <span key={i} style={{
                   padding: '3px 10px', borderRadius: 99, fontSize: '0.65rem', fontWeight: 600,
                   background: i <= o.levelIndex ? 'var(--neon-purple-dim)' : 'rgba(255,255,255,0.04)',
@@ -167,7 +206,7 @@ export default function ProgressPage() {
             <p style={{ color: 'var(--text-muted)' }}>Play some scenarios first to see your performance breakdown.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {stats.moduleStats.map((mod: any) => (
+              {stats.moduleStats.map((mod: ModuleStat) => (
                 <div key={mod.name}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{mod.name}</span>
@@ -213,7 +252,7 @@ export default function ProgressPage() {
           <CardContent style={{ padding: 24 }}>
             <h3 style={{ margin: '0 0 20px', fontSize: '1rem', fontWeight: 700 }}>Recent Activity</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {stats.recent.map((r: any, i: number) => (
+              {stats.recent.map((r: RecentActivity, i: number) => (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px',
                   borderRadius: 8, background: 'rgba(255,255,255,0.02)',

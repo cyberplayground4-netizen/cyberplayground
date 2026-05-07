@@ -15,36 +15,51 @@ import PricingPage from './PricingPage';
 import ProgressPage from './ProgressPage';
 import CertificatePage from './CertificatePage';
 import { DailyChallengeWidget } from '../components/gamification/DailyChallengeWidget';
+import { getXpProgressPercent, getLevelForXp } from '../stores/useAppStore';
 import api from '../services/api';
 
-/* ─── XP progress to next level (rough heuristic) ───────────────────────── */
-const XP_PER_LEVEL = 500;
-function xpProgress(xp: number) {
-  const pct = ((xp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100;
-  return Math.min(Math.round(pct), 100);
+
+
+interface UserActivity {
+  result: 'safe' | 'danger';
+  module: string;
+  xp: number;
 }
 
-export default function DashboardPage() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+interface DashboardStats {
+  overview: { passRate: number };
+  recent: UserActivity[];
+}
 
-  const handleLogout = async () => { await logout(); navigate('/'); };
+interface RecommendedScenario {
+  id: string;
+  title: string;
+  module: string;
+  difficulty: number;
+}
 
-  /* ── Nav link style ── */
-  const navLinkStyle = (isActive: boolean) => ({
-    display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '10px 14px', borderRadius: '10px',
-    color: isActive ? 'var(--neon-green)' : 'var(--text-muted)',
-    background: isActive ? 'var(--neon-green-dim)' : 'transparent',
-    fontWeight: isActive ? 700 : 500 as any,
-    transition: 'all 0.18s ease', textDecoration: 'none',
-    fontSize: '0.875rem', border: 'none', cursor: 'pointer',
-    fontFamily: 'var(--font-heading)',
-  });
+interface UserData {
+  name: string;
+  email: string;
+  level: string;
+  xp: number;
+  streak: number;
+}
 
-  const Sidebar = () => (
-    <aside className="dashboard-sidebar" style={{
+const navLinkStyle = (isActive: boolean) => ({
+  display: 'flex', alignItems: 'center', gap: '10px',
+  padding: '10px 14px', borderRadius: '10px',
+  color: isActive ? 'var(--neon-green)' : 'var(--text-muted)',
+  background: isActive ? 'var(--neon-green-dim)' : 'transparent',
+  fontWeight: isActive ? 700 : 500,
+  transition: 'all 0.18s ease', textDecoration: 'none',
+  fontSize: '0.875rem', border: 'none', cursor: 'pointer',
+  fontFamily: 'var(--font-heading)',
+});
+
+function Sidebar({ sidebarOpen, setSidebarOpen, user, handleLogout }: { sidebarOpen: boolean, setSidebarOpen: (open: boolean) => void, user: UserData | null, handleLogout: () => void }) {
+  return (
+    <aside className={`dashboard-sidebar${sidebarOpen ? ' open' : ''}`} style={{
       width: 'var(--sidebar-width)', flexShrink: 0, background: 'var(--bg-panel)',
       borderRight: '1px solid rgba(255,255,255,0.04)',
       padding: '20px 14px', display: 'flex', flexDirection: 'column',
@@ -139,7 +154,7 @@ export default function DashboardPage() {
               <span style={{ fontSize: '0.6rem', color: 'var(--neon-green)', fontWeight: 700 }}>{user?.xp ?? 0} XP</span>
             </div>
             <div className="progress-track" style={{ height: 4 }}>
-              <div className="progress-fill" style={{ width: `${xpProgress(user?.xp ?? 0)}%`, height: '100%' }} />
+              <div className="progress-fill" style={{ width: `${getXpProgressPercent(user?.xp ?? 0)}%`, height: '100%' }} />
             </div>
           </div>
         </div>
@@ -153,6 +168,14 @@ export default function DashboardPage() {
       </div>
     </aside>
   );
+}
+
+export default function DashboardPage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleLogout = async () => { await logout(); navigate('/'); };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-deep)' }}>
@@ -162,7 +185,7 @@ export default function DashboardPage() {
         onClick={() => setSidebarOpen(false)}
       />
 
-      <Sidebar />
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} user={user} handleLogout={handleLogout} />
 
       {/* ── Main Content ── */}
       <main className="dashboard-main" style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -205,9 +228,9 @@ export default function DashboardPage() {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /*  Overview Tab                                                              */
 /* ═══════════════════════════════════════════════════════════════════════════ */
-function OverviewTab({ user }: { user: any }) {
-  const [rec, setRec]     = useState<any>(null);
-  const [stats, setStats] = useState<any>(null);
+function OverviewTab({ user }: { user: UserData | null }) {
+  const [rec, setRec]     = useState<RecommendedScenario | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [counts, setCounts] = useState({ level: 0, xp: 0, streak: 0, pass: 0 });
 
   useEffect(() => {
@@ -245,7 +268,7 @@ function OverviewTab({ user }: { user: any }) {
   }, [user]);
 
   const o = stats?.overview;
-  const xpPct = xpProgress(user?.xp ?? 0);
+  const xpPct = getXpProgressPercent(user?.xp ?? 0);
 
   return (
     <div className="dashboard-content" style={{ padding: '36px 40px', flexGrow: 1 }}>
@@ -372,12 +395,12 @@ function OverviewTab({ user }: { user: any }) {
       </div>
 
       {/* Recent activity */}
-      {stats?.recent?.length > 0 && (
+      {(stats?.recent?.length ?? 0) > 0 && (
         <Card>
           <CardContent style={{ padding: 24 }}>
             <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Recent Activity</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {stats.recent.slice(0, 5).map((r: any, i: number) => (
+              {stats!.recent.slice(0, 5).map((r: UserActivity, i: number) => (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px',
                   borderRadius: 8, background: 'rgba(255,255,255,0.02)',
@@ -399,8 +422,9 @@ function OverviewTab({ user }: { user: any }) {
 }
 
 /* ─── Profile tab ──────────────────────────────────────────────────────────── */
-function ProfileTab({ user }: { user: any }) {
-  const xpPct = xpProgress(user?.xp ?? 0);
+function ProfileTab({ user }: { user: UserData | null }) {
+  const xpPct = getXpProgressPercent(user?.xp ?? 0);
+  const nextXp = getLevelForXp(user?.xp ?? 0).nextXp ?? 'MAX';
   return (
     <div className="dashboard-content" style={{ padding: '36px 40px' }}>
       <h1 style={{ fontSize: '1.75rem', marginBottom: 28 }}>My Profile</h1>
@@ -459,7 +483,7 @@ function ProfileTab({ user }: { user: any }) {
               <ProgressBar value={xpPct} max={100} showLabel={false} height={10} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                 <span>{user?.xp ?? 0} XP</span>
-                <span>{Math.ceil((user?.xp ?? 0) / XP_PER_LEVEL) * XP_PER_LEVEL} XP</span>
+                <span>{nextXp} XP</span>
               </div>
             </div>
           </CardContent>
