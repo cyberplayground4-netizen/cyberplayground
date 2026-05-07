@@ -3,8 +3,10 @@ generator client {
 }
 
 datasource db {
+  // Use DATABASE_URL env var in production (PostgreSQL on Railway/Render/Supabase).
+  // Falls back to local SQLite for development when DATABASE_URL is not set.
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 model users {
@@ -18,6 +20,7 @@ model users {
   xp                    Int           @default(0)
   level                 String        @default("Recruit")
   streak                Int           @default(0)
+  trial_count           Int           @default(0)
   last_active           DateTime      @default(now())
   failed_login_attempts Int           @default(0)
   locked_until          DateTime?
@@ -27,6 +30,7 @@ model users {
   subscriptions         subscriptions[]
   user_progress         user_progress[]
   user_badges           user_badges[]
+  payments              payments[]
 
   @@map(name: "users")
 }
@@ -105,6 +109,26 @@ model user_badges {
   earned_at DateTime @default(now())
 
   @@map(name: "user_badges")
+  @@unique([user_id, badge_id])
+}
+
+model payments {
+  id                    String   @id @default(uuid())
+  user_id               String
+  user                  users    @relation(fields: [user_id], references: [id])
+  razorpay_order_id     String?  @unique
+  razorpay_payment_id   String?  @unique
+  razorpay_signature    String?
+  amount                Int      // in paise (₹299 = 29900)
+  currency              String   @default("INR")
+  status                String   // "created" | "captured" | "failed" | "refunded"
+  subscription_id       String?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@map(name: "payments")
+  @@index([user_id])
+  @@index([status])
 }
 
 model daily_challenges {

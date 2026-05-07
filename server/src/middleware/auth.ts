@@ -1,14 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 
-// Extend express-session types to include userId
-declare module 'express-session' {
-  interface SessionData {
-    userId: string;
-  }
-}
+// SessionData augmentation lives in src/types/express.d.ts.
+// This file only exports the middleware function.
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.session || !req.session.userId) {
+  if (!req.session?.userId) {
     return res.status(401).json({ error: 'Unauthorized. Please log in.' });
   }
   next();
